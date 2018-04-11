@@ -1,15 +1,12 @@
 package com.mytaxi.android_demo;
 
-import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
-import android.support.design.widget.NavigationView;
 import android.support.test.InstrumentationRegistry;
-import android.support.test.espresso.matcher.RootMatchers;
-import android.support.test.rule.ActivityTestRule;
+import android.support.test.espresso.intent.rule.IntentsTestRule;
+import android.support.test.rule.GrantPermissionRule;
 import android.support.test.runner.AndroidJUnit4;
 
-import com.mytaxi.android_demo.activities.AuthenticationActivity;
 import com.mytaxi.android_demo.activities.MainActivity;
 
 import org.junit.After;
@@ -18,35 +15,31 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.util.List;
-
-import static android.support.test.espresso.Espresso.onData;
+import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.support.test.espresso.Espresso.onView;
-import static android.support.test.espresso.Espresso.openActionBarOverflowOrOptionsMenu;
-import static android.support.test.espresso.Espresso.pressBack;
 import static android.support.test.espresso.action.ViewActions.click;
-import static android.support.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static android.support.test.espresso.action.ViewActions.typeText;
-import static android.support.test.espresso.action.ViewActions.typeTextIntoFocusedView;
 import static android.support.test.espresso.assertion.ViewAssertions.matches;
+import static android.support.test.espresso.intent.Intents.intended;
+import static android.support.test.espresso.intent.matcher.IntentMatchers.toPackage;
 import static android.support.test.espresso.matcher.RootMatchers.withDecorView;
 import static android.support.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static android.support.test.espresso.matcher.ViewMatchers.withContentDescription;
 import static android.support.test.espresso.matcher.ViewMatchers.withId;
 import static android.support.test.espresso.matcher.ViewMatchers.withText;
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
-/**
- * Instrumented test, which will execute on an Android device.
- *
- * @see <a href="http://d.android.com/tools/testing">Testing documentation</a>
- */
+
 @RunWith(AndroidJUnit4.class)
 public class ChallengeTest {
 
     @Rule
-    public ActivityTestRule<MainActivity> mActivityRule = new ActivityTestRule<>(
-            MainActivity.class);
+    public IntentsTestRule<MainActivity> mActivityRule =
+            new IntentsTestRule<>(MainActivity.class);
+
+    @Rule
+    public GrantPermissionRule mRuntimePermissionRule = GrantPermissionRule.grant(ACCESS_FINE_LOCATION);
 
     private MainActivity mActivity = null;
 
@@ -56,15 +49,18 @@ public class ChallengeTest {
     }
 
     @Test
-    public void testClickActionBarItem() {
+    public void shouldLoginSearchAndCallDriver() {
 
         onView(withId(R.id.edt_username))
+                .check(matches(isDisplayed()))
                 .perform(typeText("whiteelephant261"));
 
         onView(withId(R.id.edt_password))
-                .perform(typeText("video"), closeSoftKeyboard());
+                .check(matches(isDisplayed()))
+                .perform(typeText("video"));
 
         onView(withId(R.id.btn_login))
+                .check(matches(isDisplayed()))
                 .perform(click());
 
         //Almost like idling resource !.. Its for animation
@@ -80,9 +76,10 @@ public class ChallengeTest {
                 .perform(click());
 
         onView(withId(R.id.fab))
+                .check(matches(isDisplayed()))
                 .perform(click());
 
-        SystemClock.sleep(2000);
+        intended(toPackage("com.google.android.dialer"));
 
     }
 
@@ -90,7 +87,7 @@ public class ChallengeTest {
     public void logout() {
         mActivityRule.finishActivity();
         mActivityRule.launchActivity(new Intent(InstrumentationRegistry.getTargetContext(), MainActivity.class));
-
+        SystemClock.sleep(2000);
         onView(withContentDescription("Open navigation drawer"))
                 .perform(click());
         onView(withId(R.id.nav_view))
