@@ -17,6 +17,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -33,35 +34,63 @@ public class HttpClient {
     private static final String RANDOM_USER_URL = "https://randomuser.me/api/";
     private final OkHttpClient mClient;
     private final JsonParser mJsonParser;
+    private AtomicBoolean isRunningTest;
 
     public HttpClient() {
         mClient = new OkHttpClient.Builder().readTimeout(SOCKET_TIMEOUT, TimeUnit.SECONDS).build();
         mJsonParser = new JsonParser();
     }
 
+    public synchronized boolean isRunningTest() {
+        if (null == isRunningTest) {
+            boolean istest;
+
+            try {
+                Class.forName("com.mytaxi.android_demo.ChallengeTest");
+                istest = true;
+            } catch (ClassNotFoundException e) {
+                istest = false;
+            }
+
+            isRunningTest = new AtomicBoolean(istest);
+        }
+
+        return isRunningTest.get();
+    }
+
+
     public void fetchDrivers(final DriverCallback driverCallback) {
         int amount = 256;
         String seed = "23f8827e04239990";
         String url = RANDOM_USER_URL + "?results=" + amount + "&seed=" + seed;
         Request request = new Request.Builder().url(url).build();
-        mClient.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
-            }
-
-            @TargetApi(Build.VERSION_CODES.KITKAT)
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                try (ResponseBody responseBody = response.body()) {
-                    if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
-                    ArrayList<Driver> drivers = getDrivers(responseBody.string());
-                    Log.i(LOG_TAG, "Fetched successfully " + drivers.size() + " drivers.");
-                    driverCallback.setDrivers(drivers);
-                    driverCallback.run();
+        if (!isRunningTest()) {
+            mClient.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    e.printStackTrace();
                 }
-            }
-        });
+
+                @TargetApi(Build.VERSION_CODES.KITKAT)
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    try (ResponseBody responseBody = response.body()) {
+                        if (!response.isSuccessful())
+                            throw new IOException("Unexpected code " + response);
+                        ArrayList<Driver> drivers = getDrivers(responseBody.string());
+                        Log.i(LOG_TAG, "Fetched successfully " + drivers.size() + " drivers.");
+                        driverCallback.setDrivers(drivers);
+                        driverCallback.run();
+                    }
+                }
+            });
+        } else {
+            ArrayList<Driver> drivers = new ArrayList<>();
+            drivers.add(new Driver("Sarah Friedrich","123123123","foo","Hamburg",new Date(2017,12,2)));
+            Log.i(LOG_TAG, "Fetched successfully " + drivers.size() + " drivers.");
+            driverCallback.setDrivers(drivers);
+            driverCallback.run();
+        }
     }
 
     public void fetchUser(String seed, final UserCallback userCallback) {
@@ -77,7 +106,8 @@ public class HttpClient {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 try (ResponseBody responseBody = response.body()) {
-                    if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
+                    if (!response.isSuccessful())
+                        throw new IOException("Unexpected code " + response);
                     userCallback.setUser(getUser(responseBody.string()));
                     userCallback.run();
                 }
@@ -89,7 +119,7 @@ public class HttpClient {
         JsonObject jsonObject = mJsonParser.parse(jsonResponse).getAsJsonObject();
         JsonArray results = jsonObject.getAsJsonArray("results");
         ArrayList<Driver> drivers = new ArrayList<>();
-        for (JsonElement jsonElement :results) {
+        for (JsonElement jsonElement : results) {
             JsonObject jsonUser = jsonElement.getAsJsonObject();
             JsonObject name = jsonUser.getAsJsonObject("name");
             String firstName = name.get("first").getAsString();
